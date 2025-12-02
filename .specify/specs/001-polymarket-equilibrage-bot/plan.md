@@ -8,7 +8,7 @@
 
 ## Overview
 
-This implementation plan outlines the technical approach for building the Polymarket Equilibrage Bot. The system will be built as a full-stack application with a Python backend for trading logic and a modern web frontend for the dashboard.
+This implementation plan outlines the technical approach for building the Polymarket Equilibrage Bot. The system will be built as a full-stack application with a Python backend for trading logic and a modern web frontend for the dashboard. The bot supports flexible entry ratios per bet, configurable stop-loss/take-profit thresholds, and intelligent partial liquidation that sells losing positions while holding winning positions to maximize profit.
 
 ---
 
@@ -135,9 +135,10 @@ Whale tracker data model:
 
 #### [NEW] `backend/app/services/trading_engine.py`
 Core trading logic:
-- `enter_position()`: Execute 50/50 YES/NO entry
-- `liquidate_position()`: Sell specified side
-- `close_position()`: Close both sides
+- `enter_position()`: Execute position entry with configurable YES/NO ratio
+- `liquidate_side()`: Sell specified side only (YES or NO)
+- `close_position()`: Close both sides (full exit)
+- Support for custom ratios per bet (50/50, 60/40, 70/30, 100/0, etc.)
 - Transaction confirmation and error handling
 
 #### [NEW] `backend/app/services/polymarket_client.py`
@@ -149,9 +150,11 @@ Wrapper around py-clob-client:
 
 #### [NEW] `backend/app/services/position_monitor.py`
 Position monitoring service:
-- Track all active positions
-- Detect 30% divergence
-- Trigger automatic liquidation
+- Track all active positions every 30 seconds (configurable)
+- Detect when YES or NO reaches configured stop-loss threshold
+- Detect when YES or NO reaches configured take-profit threshold
+- Support single threshold OR separate YES/NO thresholds
+- Trigger automatic partial liquidation (sell one side only)
 - Update position status in database
 
 ---
@@ -274,9 +277,13 @@ Main dashboard page:
 #### [NEW] `frontend/src/pages/Settings.tsx`
 Configuration page:
 - Wallet configuration form
-- Trading parameters (SL, TP, capital allocation)
+- Entry ratio configuration per bet (default: 50/50)
+- Stop-loss configuration (single OR separate YES/NO thresholds)
+- Take-profit configuration (single OR separate YES/NO thresholds)
+- Capital allocation percentage
 - Position limits slider
 - Opportunity threshold slider
+- Save/reset buttons with persistence
 
 #### [NEW] `frontend/src/pages/History.tsx`
 Trade history page:
@@ -370,13 +377,15 @@ CREATE TABLE positions (
     market_id VARCHAR NOT NULL,
     market_name VARCHAR NOT NULL,
     entry_time TIMESTAMP NOT NULL,
+    entry_ratio_yes DECIMAL NOT NULL,  -- Entry ratio for YES (0-100)
+    entry_ratio_no DECIMAL NOT NULL,   -- Entry ratio for NO (0-100)
     entry_price_yes DECIMAL NOT NULL,
     entry_price_no DECIMAL NOT NULL,
     capital_yes DECIMAL NOT NULL,
     capital_no DECIMAL NOT NULL,
     current_price_yes DECIMAL,
     current_price_no DECIMAL,
-    status VARCHAR NOT NULL, -- 'active', 'closed', 'liquidated'
+    status VARCHAR NOT NULL, -- 'active', 'partially_liquidated', 'closed'
     liquidated_side VARCHAR, -- 'yes', 'no', NULL
     liquidation_time TIMESTAMP,
     close_time TIMESTAMP,
@@ -407,8 +416,22 @@ CREATE TABLE opportunities (
 CREATE TABLE config (
     id INTEGER PRIMARY KEY DEFAULT 1,
     wallet_credentials_encrypted TEXT,
-    stop_loss DECIMAL DEFAULT 0,
-    take_profit DECIMAL DEFAULT 0,
+    -- Stop-loss configuration
+    stop_loss_enabled BOOLEAN DEFAULT FALSE,
+    stop_loss_single_threshold DECIMAL DEFAULT 0,  -- If using single threshold
+    stop_loss_yes_threshold DECIMAL DEFAULT 0,     -- If using separate thresholds
+    stop_loss_no_threshold DECIMAL DEFAULT 0,
+    stop_loss_mode VARCHAR DEFAULT 'single',       -- 'single' or 'separate'
+    -- Take-profit configuration
+    take_profit_enabled BOOLEAN DEFAULT FALSE,
+    take_profit_single_threshold DECIMAL DEFAULT 0,
+    take_profit_yes_threshold DECIMAL DEFAULT 0,
+    take_profit_no_threshold DECIMAL DEFAULT 0,
+    take_profit_mode VARCHAR DEFAULT 'single',
+    -- Entry ratio defaults
+    default_entry_ratio_yes DECIMAL DEFAULT 50,
+    default_entry_ratio_no DECIMAL DEFAULT 50,
+    -- Other settings
     capital_allocation_percent INTEGER DEFAULT 10,
     max_positions INTEGER DEFAULT 3,
     opportunity_threshold INTEGER DEFAULT 6,
@@ -455,9 +478,12 @@ CREATE TABLE whales (
 - `GET /api/positions` - List active positions
   - Response: `{ positions: Position[] }`
 - `POST /api/positions` - Enter new position
-  - Body: `{ market_id: string, capital_amount: number }`
+  - Body: `{ market_id: string, capital_amount: number, ratio_yes: number, ratio_no: number }`
   - Response: `{ position: Position }`
-- `DELETE /api/positions/{id}` - Close position
+- `DELETE /api/positions/{id}` - Close position (both sides)
+  - Response: `{ success: boolean }`
+- `POST /api/positions/{id}/liquidate` - Liquidate one side
+  - Body: `{ side: 'yes' | 'no' }`
   - Response: `{ success: boolean }`
 
 #### Opportunities
@@ -469,7 +495,7 @@ CREATE TABLE whales (
 - `GET /api/config` - Get configuration
   - Response: `{ config: Config }`
 - `PUT /api/config` - Update configuration
-  - Body: `{ stop_loss?: number, take_profit?: number, ... }`
+  - Body: `{ stop_loss_enabled?: boolean, stop_loss_mode?: string, stop_loss_single_threshold?: number, stop_loss_yes_threshold?: number, stop_loss_no_threshold?: number, take_profit_enabled?: boolean, take_profit_mode?: string, default_entry_ratio_yes?: number, default_entry_ratio_no?: number, ... }`
   - Response: `{ config: Config }`
 
 #### Dashboard
@@ -536,7 +562,10 @@ npm test
 #### 1. Configuration Testing
 - [ ] Navigate to Settings page
 - [ ] Configure wallet (use test wallet)
-- [ ] Set trading parameters (SL=0, TP=0, capital=10%)
+- [ ] Set entry ratio (test: 60% YES / 40% NO)
+- [ ] Set stop-loss mode to 'single' with threshold 25%
+- [ ] Set take-profit mode to 'separate' with YES=30%, NO=20%
+- [ ] Set capital allocation to 10%
 - [ ] Set position limit to 3
 - [ ] Set opportunity threshold to 6
 - [ ] Verify settings persist after page refresh
@@ -550,15 +579,18 @@ npm test
 
 #### 3. Position Entry (Manual)
 - [ ] From opportunities table, click "Enter Position" on high-scored opportunity
+- [ ] Configure entry ratio (e.g., 60% YES / 40% NO)
 - [ ] Verify position appears in Dashboard active positions
-- [ ] Verify capital allocated correctly (50% YES, 50% NO)
+- [ ] Verify capital allocated correctly per configured ratio
 - [ ] Verify wallet balance decreased
 
-#### 4. Position Monitoring
+#### 4. Position Monitoring & Partial Liquidation
 - [ ] Wait for price movement in active position
 - [ ] Verify current prices update in real-time
 - [ ] Verify P&L calculated correctly
-- [ ] If 30% drop occurs, verify automatic liquidation
+- [ ] When threshold reached, verify only one side liquidated
+- [ ] Verify opposite side remains active
+- [ ] Verify position status changes to 'partially_liquidated'
 
 #### 5. Manual Position Close
 - [ ] Click "Close" button on active position

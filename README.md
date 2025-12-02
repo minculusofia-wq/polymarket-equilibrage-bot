@@ -1,14 +1,14 @@
 # Polymarket Equilibrage Bot
 
-Un bot de trading automatisé pour Polymarket qui implémente une stratégie d'équilibrage avec entrée 50/50 YES/NO et liquidation automatique à 30% de divergence.
+Un bot de trading automatisé pour Polymarket qui implémente une stratégie d'équilibrage flexible avec ratios configurables et liquidation intelligente pour maximiser les profits.
 
 ## 🎯 Vue d'ensemble
 
 Le Polymarket Equilibrage Bot est un système de trading automatisé qui :
-- Entre des positions équilibrées (50% YES / 50% NO) sur les marchés Polymarket
-- Surveille les mouvements de prix en temps réel
-- Liquide automatiquement la position perdante lorsqu'une divergence de 30% est détectée
-- Maintient la position gagnante jusqu'à la résolution du pari
+- Entre des positions avec **ratios configurables** (50/50, 60/40, 70/30, ou même 100/0)
+- Surveille les mouvements de prix en temps réel (toutes les 30 secondes)
+- Liquide **intelligemment uniquement le côté perdant** quand les seuils sont atteints
+- **Maintient le côté gagnant** jusqu'à la résolution du pari pour maximiser le profit
 - Détecte et score les opportunités de trading (1-10)
 - Suit les mouvements des "whales" (gros traders)
 - Agrège les informations pertinentes du marché
@@ -16,10 +16,11 @@ Le Polymarket Equilibrage Bot est un système de trading automatisé qui :
 ## 📋 Fonctionnalités principales
 
 ### Trading automatisé
-- ✅ Entrée automatique sur positions équilibrées 50/50
-- ✅ Surveillance continue des positions actives
-- ✅ Liquidation automatique à 30% de baisse
-- ✅ Fermeture manuelle des positions à tout moment
+- ✅ Entrée avec **ratios configurables par bet** (50/50, 60/40, 70/30, 100/0, etc.)
+- ✅ Surveillance continue des positions actives (toutes les 30 secondes)
+- ✅ **Liquidation partielle intelligente** : vend uniquement le côté perdant
+- ✅ **Maintien du côté gagnant** jusqu'à résolution du bet
+- ✅ Fermeture manuelle complète disponible à tout moment
 - ✅ Gestion du capital avec allocation configurable
 
 ### Détection d'opportunités
@@ -37,7 +38,8 @@ Le Polymarket Equilibrage Bot est un système de trading automatisé qui :
 - ⚙️ Configuration des paramètres de trading
 
 ### Gestion des risques
-- 🛡️ Stop-loss et take-profit configurables
+- 🛡️ **Stop-loss configurable** : seuil unique OU seuils séparés YES/NO (défaut: 0% = désactivé)
+- 📈 **Take-profit configurable** : seuil unique OU seuils séparés YES/NO (défaut: 0% = désactivé)
 - 🔢 Limite de positions concurrentes (1-10)
 - 💵 Allocation de capital par pari (en %)
 - 🔐 Gestion sécurisée des wallets
@@ -111,8 +113,12 @@ Accédez à la page **Settings** pour configurer :
 - Clé privée (stockée chiffrée)
 
 #### Paramètres de trading
-- **Stop-Loss (SL)** : Valeur par défaut = 0
-- **Take-Profit (TP)** : Valeur par défaut = 0
+- **Ratio d'entrée** : Configurable par bet (défaut: 50% YES / 50% NO)
+  - Exemples: 60/40, 70/30, 100/0 (tout sur un seul côté)
+- **Stop-Loss (SL)** : Seuil de liquidation (défaut: 0% = désactivé)
+  - Mode unique (s'applique à YES et NO) OU modes séparés
+- **Take-Profit (TP)** : Seuil de prise de profit (défaut: 0% = désactivé)
+  - Mode unique (s'applique à YES et NO) OU modes séparés
 - **Allocation de capital** : Pourcentage du capital par pari (1-100%)
 
 #### Limites de positions
@@ -215,21 +221,34 @@ La page **History** contient :
 1. Le scanner détecte une opportunité
 2. Le scorer attribue un score 1-10
 3. Si score >= seuil configuré → entrée automatique
-4. Allocation : 50% capital sur YES + 50% sur NO
+4. Allocation selon ratio configuré (ex: 60% YES / 40% NO)
 
 ### Surveillance
 - Monitoring toutes les 30 secondes (configurable)
 - Calcul de la divergence par rapport au prix d'entrée
-- Détection du seuil de 30% de baisse
+- Détection des seuils stop-loss et take-profit configurés
 
-### Liquidation
-- **Déclenchement** : Quand YES ou NO baisse de 30%
-- **Action** : Vente immédiate du côté perdant
-- **Maintien** : Le côté gagnant reste jusqu'à résolution du pari
+### Liquidation intelligente
+- **Déclenchement** : Quand un seuil (SL ou TP) est atteint sur YES ou NO
+- **Action** : Vente **uniquement du côté concerné** (perdant ou gagnant selon le seuil)
+- **Maintien** : L'autre côté reste actif jusqu'à résolution du pari
+- **Exemple** : 
+  ```
+  Entrée: 100$ → 50$ YES + 50$ NO
+  
+  Scénario:
+  - YES monte à 70$ (valeur actuelle)
+  - NO baisse à 30$ (valeur actuelle)
+  
+  Si SL à 25% atteint sur NO:
+  1. Vendre NO → récupère 30$
+  2. Garder YES jusqu'à 100% → récupère 100$
+  3. Profit total = 30$ + 100$ - 100$ = 30$ ✅
+  ```
 
 ### Fermeture manuelle
 - Disponible à tout moment via le dashboard
-- Vend les deux côtés (YES et NO)
+- Vend les **deux côtés** (YES et NO)
 - Capital retourné au wallet
 
 ## 🧪 Tests

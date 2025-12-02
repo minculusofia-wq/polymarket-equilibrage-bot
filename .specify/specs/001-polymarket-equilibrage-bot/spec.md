@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-The Polymarket Equilibrage Bot is an automated trading system that implements a balanced betting strategy on Polymarket prediction markets. The bot enters positions at 50% YES / 50% NO, monitors price movements, and automatically liquidates losing positions while holding winning positions when a 30% price divergence occurs.
+The Polymarket Equilibrage Bot is an automated trading system that implements a flexible equilibrage strategy on Polymarket prediction markets. The bot enters positions with configurable YES/NO ratios per bet, monitors price movements, and intelligently liquidates losing positions while holding winning positions when configurable stop-loss or take-profit thresholds are reached. The strategy maximizes profit by selling the declining side and riding the winning side to bet resolution.
 
 ---
 
@@ -72,12 +72,15 @@ Traders on Polymarket must manually:
 
 #### US-1.2: Trading Parameters
 **As a** trader  
-**I want to** configure trading parameters (SL, TP, capital allocation)  
+**I want to** configure trading parameters (SL, TP, entry ratios)  
 **So that** I can control risk and position sizing
 
 **Acceptance Criteria:**
-- Stop-loss (SL) configurable with default value of 0
-- Take-profit (TP) configurable with default value of 0
+- Stop-loss (SL) configurable with default value of 0% (disabled)
+- Take-profit (TP) configurable with default value of 0% (disabled)
+- Option for single threshold (applies to both YES/NO) OR separate thresholds for YES and NO
+- Entry ratio configurable per bet (e.g., 50/50, 60/40, 70/30, or even 100/0)
+- Default entry ratio: 50% YES / 50% NO
 - Per-bet capital allocation as percentage (1-100%)
 - Settings persist across bot restarts
 - Changes take effect for new positions only
@@ -152,13 +155,15 @@ Traders on Polymarket must manually:
 
 ### Epic 3: Trading Execution
 
-#### US-3.1: Equilibrage Entry
+#### US-3.1: Flexible Equilibrage Entry
 **As a** trader  
-**I want to** the bot to enter 50/50 YES/NO positions automatically  
-**So that** I can execute the equilibrage strategy
+**I want to** the bot to enter positions with configurable YES/NO ratios  
+**So that** I can execute customized equilibrage strategies per bet
 
 **Acceptance Criteria:**
-- Bot enters equal capital in YES and NO positions
+- Bot enters positions with configurable ratio (e.g., 50/50, 60/40, 70/30, 100/0)
+- Ratio configurable per bet opportunity
+- Default ratio: 50% YES / 50% NO
 - Entry only when opportunity score >= configured threshold
 - Respects position limits (won't exceed max concurrent positions)
 - Uses configured per-bet capital allocation percentage
@@ -166,25 +171,30 @@ Traders on Polymarket must manually:
 
 #### US-3.2: Position Monitoring
 **As a** trader  
-**I want to** positions monitored for 30% divergence  
+**I want to** positions monitored for configured SL/TP thresholds  
 **So that** the strategy executes correctly
 
 **Acceptance Criteria:**
-- Real-time monitoring of all active positions
-- Detects when YES or NO drops 30% from entry price
+- Real-time monitoring of all active positions (every 30 seconds)
+- Detects when YES or NO reaches configured stop-loss threshold
+- Detects when YES or NO reaches configured take-profit threshold
+- Supports single threshold (applies to both) OR separate YES/NO thresholds
 - Monitoring continues until bet resolution or manual close
-- Price data refreshed at reasonable intervals
+- Price data refreshed every 30 seconds (configurable)
 
-#### US-3.3: Automatic Liquidation
+#### US-3.3: Intelligent Automatic Liquidation
 **As a** trader  
-**I want to** losing positions automatically liquidated at 30% drop  
-**So that** losses are limited per strategy
+**I want to** losing positions automatically liquidated when thresholds are reached  
+**So that** I maximize profit by selling losers and holding winners
 
 **Acceptance Criteria:**
-- When position drops 30%, bot automatically sells that side
-- Winning side held until bet resolution
+- When stop-loss threshold reached, bot automatically sells the losing side only
+- When take-profit threshold reached, bot automatically sells the winning side only
+- Opposite side held until bet resolution (or manual intervention)
+- Example: 50$ YES + 50$ NO → YES rises to 70$, NO falls to 30$ → Sell NO (recover 30$), hold YES to 100$ (gain 50$)
 - Liquidation executed immediately upon threshold breach
 - Liquidation transaction confirmed before position updated
+- Partial liquidation tracked separately in database
 
 #### US-3.4: Manual Position Close
 **As a** trader  
@@ -276,16 +286,24 @@ Traders on Polymarket must manually:
 ## Functional Requirements
 
 ### FR-1: Trading Strategy
-- Bot must enter positions at 50% capital YES / 50% capital NO
-- Bot must monitor for 30% price divergence from entry
-- Bot must liquidate losing side when 30% drop detected
-- Bot must hold winning side until bet resolution
+- Bot must support configurable entry ratios per bet (default: 50% YES / 50% NO)
+- Bot must support custom ratios (e.g., 60/40, 70/30, 100/0)
+- Bot must monitor positions every 30 seconds (configurable)
+- Bot must support configurable stop-loss thresholds (default: 0% = disabled)
+- Bot must support configurable take-profit thresholds (default: 0% = disabled)
+- Bot must support single threshold OR separate YES/NO thresholds
+- Bot must liquidate only the side that reaches threshold (losing or winning)
+- Bot must hold opposite side until bet resolution or manual close
+- Liquidation logic: sell declining side, ride winning side to maximize profit
 
 ### FR-2: Risk Management
-- Configurable stop-loss and take-profit (default: 0)
+- Configurable stop-loss and take-profit (default: 0% = disabled)
+- Option for single threshold OR separate YES/NO thresholds
+- Configurable entry ratio per bet (default: 50/50)
 - Configurable position limits (1-10 concurrent positions)
 - Configurable per-bet capital allocation (percentage)
-- Manual override capability for all positions
+- All settings persist across restarts unless reset
+- Manual override capability for all positions (full close)
 
 ### FR-3: Opportunity Detection
 - Continuous market scanning

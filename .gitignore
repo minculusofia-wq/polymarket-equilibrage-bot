@@ -1,0 +1,34 @@
+# Environment variables
+.env
+.env.local
+
+# Dependencies
+__pycache__/
+*.py[cod]
+*$py.class
+backend/.venv/
+backend/venv/
+node_modules/
+frontend/node_modules/
+.pytest_cache/
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# Logs and databases
+*.log
+*.pid
+*.sqlite
+postgres_data/
+
+# OS specific
+.DS_Store
+.vscode/
+.idea/
+
+# Artifacts
+polymarket-bot-v*.zip
+Démarrer Bot.app/
+Arrêter Bot.app/

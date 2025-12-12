@@ -51,6 +51,10 @@ class Position(Base):
     # Which side is still active (for partial liquidation)
     active_side = Column(Enum(PositionSide), default=PositionSide.BOTH)
     
+    # Independent Leg Status
+    is_yes_closed = Column(Boolean, default=False)
+    is_no_closed = Column(Boolean, default=False)
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

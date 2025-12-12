@@ -15,6 +15,8 @@ from backend.config import settings
 from backend.routers import scanner_router, positions_router, dashboard_router, trading_router
 from backend.services.auto_trading import get_auto_trading_engine
 from backend.services.websocket_manager import get_ws_manager
+from backend.services.advanced_scanner import get_advanced_scanner
+
 
 # Configure logging
 logging.basicConfig(
@@ -26,9 +28,27 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager"""
-    logger.info("🚀 Starting Polymarket Bot API...")
+    # Startup
+    logger.info("Starting up...")
     
+    # Check DB connection
+    try:
+        from backend.database import engine
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("Database connection successful")
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        
+    # Check Redis
+    try:
+        redis = get_redis_client()
+        await redis.ping()
+        logger.info("Redis connection successful")
+    except Exception as e:
+        logger.error(f"Redis connection failed: {e}")
+        
     # Create database tables
     Base.metadata.create_all(bind=engine)
     logger.info("📊 Database tables created")
@@ -36,17 +56,28 @@ async def lifespan(app: FastAPI):
     # Initialize auto trading engine (but don't start until user enables)
     trading_engine = get_auto_trading_engine()
     logger.info("🤖 Trading engine initialized (standby)")
+
+    # Initialize Scanner (and WS if Sniper Mode enabled)
+    scanner = get_advanced_scanner()
+    await scanner.initialize()
+    logger.info("🔍 Advanced scanner initialized")
     
     logger.info(f"🔧 Debug mode: {settings.debug}")
+    logger.info("🚀 Polymarket Bot API ready")
     
     yield
     
     # Shutdown
-    logger.info("🛑 Shutting down...")
+    logger.info("Shutting down...")
+    
+    # Close scanner resources
+    await scanner.close()
+    logger.info("🔍 Advanced scanner closed")
     
     # Stop trading engine if running
     if trading_engine.is_running:
         trading_engine.stop()
+        logger.info("🤖 Trading engine stopped")
     
     logger.info("👋 Polymarket Bot API stopped")
 

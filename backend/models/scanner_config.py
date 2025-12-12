@@ -18,6 +18,12 @@ class ScannerConfig(Base):
     
     # Scanning settings
     scan_interval_seconds = Column(Integer, default=30)
+    
+    # Smart Exit Strategy (Legging Out)
+    # exit_model: "GLOBAL" or "INDEPENDENT"
+    exit_model = Column(String, default="GLOBAL")
+    leg_stop_loss_percent = Column(Float, default=0.0)  # For individual leg (drawdown)
+    leg_take_profit_price = Column(Float, default=0.0)  # For individual leg (target price)
     max_markets_per_scan = Column(Integer, default=100)
     
     # Scoring thresholds
@@ -61,4 +67,7 @@ class ScannerConfig(Base):
             "default_ratio_no": self.default_ratio_no,
             "stop_loss_percent": self.stop_loss_percent,
             "take_profit_percent": self.take_profit_percent,
+            "exit_model": self.exit_model,
+            "leg_stop_loss_percent": self.leg_stop_loss_percent,
+            "leg_take_profit_price": self.leg_take_profit_price,
         }

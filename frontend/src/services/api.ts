@@ -49,6 +49,9 @@ export interface ScannerConfig {
     default_ratio_no: number;
     stop_loss_percent: number;
     take_profit_percent: number;
+    exit_model: 'GLOBAL' | 'INDEPENDENT';
+    leg_stop_loss_percent: number;
+    leg_take_profit_price: number;
 }
 
 export interface Position {

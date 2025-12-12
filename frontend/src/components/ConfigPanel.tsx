@@ -95,33 +95,86 @@ export function ConfigPanel({ config, onUpdate }: ConfigPanelProps) {
                     </div>
                 </div>
 
-                {/* SL/TP */}
-                <div className="config-section">
-                    <h4>Stop Loss / Take Profit</h4>
+                {/* Exit Strategy */}
+                <div className="config-section" style={{ minWidth: '300px' }}>
+                    <h4>🧠 Stratégie de Sortie</h4>
 
-                    <div className="config-item">
-                        <label>Stop Loss</label>
-                        <input
-                            type="number"
-                            min={1}
-                            max={50}
-                            value={config.stop_loss_percent}
-                            onChange={(e) => onUpdate({ stop_loss_percent: Number(e.target.value) })}
-                        />
-                        <span className="hint">%</span>
+                    <div style={{ marginBottom: '15px' }}>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9em', color: '#888' }}>Modèle de Sortie</label>
+                        <select
+                            value={config.exit_model || 'GLOBAL'}
+                            onChange={(e) => onUpdate({ exit_model: e.target.value as 'GLOBAL' | 'INDEPENDENT' })}
+                            className="strategy-select"
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                background: '#333',
+                                color: 'white',
+                                border: '1px solid #444',
+                                borderRadius: '4px'
+                            }}
+                        >
+                            <option value="GLOBAL">Global P&L (Classique)</option>
+                            <option value="INDEPENDENT">Smart Exit (Legging Out)</option>
+                        </select>
                     </div>
 
-                    <div className="config-item">
-                        <label>Take Profit</label>
-                        <input
-                            type="number"
-                            min={1}
-                            max={100}
-                            value={config.take_profit_percent}
-                            onChange={(e) => onUpdate({ take_profit_percent: Number(e.target.value) })}
-                        />
-                        <span className="hint">%</span>
-                    </div>
+                    {config.exit_model === 'INDEPENDENT' ? (
+                        <div className="smart-exit-config" style={{ padding: '10px', background: 'rgba(0, 255, 0, 0.05)', borderRadius: '4px', border: '1px solid rgba(0, 255, 0, 0.2)' }}>
+                            <div className="config-item">
+                                <label>Cut Loser (Drawdown)</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={99}
+                                    value={config.leg_stop_loss_percent || 0}
+                                    onChange={(e) => onUpdate({ leg_stop_loss_percent: Number(e.target.value) })}
+                                />
+                                <span className="hint">%</span>
+                            </div>
+                            <small style={{ display: 'block', color: '#aaa', marginBottom: '10px' }}>Vend la jambe perdante si elle chute de X%.</small>
+
+                            <div className="config-item">
+                                <label>Take Winner (Price)</label>
+                                <input
+                                    type="number"
+                                    min={0.5}
+                                    max={1.0}
+                                    step={0.01}
+                                    value={config.leg_take_profit_price || 0}
+                                    onChange={(e) => onUpdate({ leg_take_profit_price: Number(e.target.value) })}
+                                />
+                                <span className="hint">$</span>
+                            </div>
+                            <small style={{ display: 'block', color: '#aaa' }}>Vend la jambe gagnante si elle atteint X $.</small>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="config-item">
+                                <label>Stop Loss Global</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={50}
+                                    value={config.stop_loss_percent}
+                                    onChange={(e) => onUpdate({ stop_loss_percent: Number(e.target.value) })}
+                                />
+                                <span className="hint">%</span>
+                            </div>
+
+                            <div className="config-item">
+                                <label>Take Profit Global</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={100}
+                                    value={config.take_profit_percent}
+                                    onChange={(e) => onUpdate({ take_profit_percent: Number(e.target.value) })}
+                                />
+                                <span className="hint">%</span>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

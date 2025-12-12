@@ -125,13 +125,14 @@ class AutoTradingEngine:
                     # 2. Always monitor existing positions (even if paused)
                     await self._monitor_positions(db, config)
                     
-                    db.commit()
+                    # Store interval for sleep outside session
+                    scan_interval = config.scan_interval_seconds
                     
                 finally:
                     db.close()
                 
                 # Wait before next iteration
-                await asyncio.sleep(config.scan_interval_seconds if config else 30)
+                await asyncio.sleep(scan_interval)
                 
             except asyncio.CancelledError:
                 break
@@ -328,17 +329,59 @@ class AutoTradingEngine:
         for position in active_positions:
             await self._update_position_prices(db, position)
             
-            # Check Stop Loss
-            if position.pnl_percent <= -config.stop_loss_percent:
-                logger.warning(f"📉 Stop Loss triggered for {position.id}: {position.pnl_percent:.2f}%")
-                await self._close_position(db, position, reason="STOP LOSS")
-                continue
-            
-            # Check Take Profit
-            if position.pnl_percent >= config.take_profit_percent:
-                logger.info(f"📈 Take Profit triggered for {position.id}: {position.pnl_percent:.2f}%")
-                await self._close_position(db, position, reason="TAKE PROFIT")
-                continue
+            # ==========================================
+            # STRATEGY 1: GLOBAL P&L (Legacy)
+            # ==========================================
+            if config.exit_model == "GLOBAL":
+                # Check Stop Loss
+                if position.pnl_percent <= -config.stop_loss_percent:
+                    logger.warning(f"📉 Stop Loss triggered for {position.id}: {position.pnl_percent:.2f}%")
+                    await self._close_position(db, position, reason="STOP LOSS")
+                    continue
+                
+                # Check Take Profit
+                if position.pnl_percent >= config.take_profit_percent:
+                    logger.info(f"📈 Take Profit triggered for {position.id}: {position.pnl_percent:.2f}%")
+                    await self._close_position(db, position, reason="TAKE PROFIT")
+                    continue
+
+            # ==========================================
+            # STRATEGY 2: INDEPENDENT LEGS (Smart Exit)
+            # ==========================================
+            elif config.exit_model == "INDEPENDENT":
+                # Check YES Leg
+                if not position.is_yes_closed:
+                    # Stop Loss (Drawdown)
+                    if position.current_price_yes < (position.entry_price_yes * (1 - (config.leg_stop_loss_percent / 100))):
+                        logger.warning(f"📉 Cutting YES loser on {position.market_name}")
+                        await self._close_leg(db, position, TradeSide.YES, reason="UGLY LEG CUT")
+                    
+                    # Take Profit (Target Price)
+                    elif position.current_price_yes >= config.leg_take_profit_price:
+                        logger.info(f"🚀 Taking YES profit on {position.market_name}")
+                        await self._close_leg(db, position, TradeSide.YES, reason="MOON LEG TAKEN")
+
+                # Check NO Leg
+                if not position.is_no_closed:
+                    # Stop Loss (Drawdown)
+                    if position.current_price_no < (position.entry_price_no * (1 - (config.leg_stop_loss_percent / 100))):
+                        logger.warning(f"📉 Cutting NO loser on {position.market_name}")
+                        await self._close_leg(db, position, TradeSide.NO, reason="UGLY LEG CUT")
+                    
+                    # Take Profit (Target Price)
+                    elif position.current_price_no >= config.leg_take_profit_price:
+                        logger.info(f"🚀 Taking NO profit on {position.market_name}")
+                        await self._close_leg(db, position, TradeSide.NO, reason="MOON LEG TAKEN")
+                
+                # Close position if both legs are gone
+                if position.is_yes_closed and position.is_no_closed:
+                     position.status = PositionStatus.CLOSED
+                     position.closed_at = datetime.utcnow()
+                     logger.info(f"✅ Position {position.id} fully CLOSED (both legs exited)")
+                     await self.ws_manager.broadcast({
+                        "type": "POSITION_CLOSED",
+                        "data": {"id": position.id, "market_name": position.market_name, "reason": "BOTH LEGS EXITED"}
+                     })
             
             # TODO: Implement smart liquidation (sell loser, keep winner)
         
@@ -410,6 +453,63 @@ class AutoTradingEngine:
     
     # ==================== HELPERS ====================
     
+    async def _close_leg(self, db: Session, position: Position, side: TradeSide, reason: str = "PARTIAL"):
+        """Close a single leg of the position"""
+        logger.info(f"Closing Leg {side} for position {position.id}: {reason}")
+        
+        token_id = ""
+        amount = 0.0
+        current_price = 0.0
+        
+        # Get data based on side
+        try:
+            market = await self.client.get_market(position.market_id)
+            tokens = market.get("tokens", [])
+            
+            if side == TradeSide.YES:
+                token_id = tokens[0].get("token_id")
+                amount = position.amount_yes
+                current_price = await self.client.get_midpoint_price(token_id) or position.current_price_yes
+            else:
+                token_id = tokens[1].get("token_id")
+                amount = position.amount_no
+                current_price = await self.client.get_midpoint_price(token_id) or position.current_price_no
+                
+            # Execute Sell
+            # TODO: Integrate real order execution here when wallet is ready
+            # For now, we simulate the 'Sell' logic on DB level if real order succeeds (or implies logic)
+            # In Phase 5, we assume we might not have keys yet so we just mark it.
+            
+            # Record exit trade
+            self._record_trade(db, position, side, TradeType.EXIT, amount, current_price)
+            
+            # Update Position State
+            if side == TradeSide.YES:
+                position.is_yes_closed = True
+                position.active_side = PositionSide.NO if not position.is_no_closed else PositionSide.BOTH # Should ideally be NONE if closed
+                position.amount_yes = 0 # Holdings are gone
+                position.current_value_yes = 0
+            else:
+                position.is_no_closed = True
+                position.active_side = PositionSide.YES if not position.is_yes_closed else PositionSide.BOTH
+                position.amount_no = 0
+                position.current_value_no = 0
+                
+            db.commit()
+            
+            await self.ws_manager.broadcast({
+                "type": "LEG_CLOSED",
+                "data": {
+                    "id": position.id,
+                    "side": side.value,
+                    "reason": reason,
+                    "price": current_price
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Error closing leg {side}: {e}")
+
     def _get_config(self, db: Session) -> ScannerConfig:
         """Get scanner configuration"""
         config = db.query(ScannerConfig).first()

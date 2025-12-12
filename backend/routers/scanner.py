@@ -57,6 +57,9 @@ class ScannerConfigResponse(BaseModel):
     default_ratio_no: int
     stop_loss_percent: float
     take_profit_percent: float
+    exit_model: str = "GLOBAL"
+    leg_stop_loss_percent: float = 0.0
+    leg_take_profit_price: float = 0.0
 
 
 class UpdateConfigRequest(BaseModel):
@@ -72,6 +75,9 @@ class UpdateConfigRequest(BaseModel):
     take_profit_percent: Optional[float] = None
     default_ratio_yes: Optional[int] = None
     default_ratio_no: Optional[int] = None
+    exit_model: Optional[str] = None
+    leg_stop_loss_percent: Optional[float] = None
+    leg_take_profit_price: Optional[float] = None
 
 
 # ==================== HELPERS ====================
@@ -80,10 +86,54 @@ def get_or_create_config(db: Session) -> ScannerConfig:
     """Get or create scanner configuration"""
     config = db.query(ScannerConfig).first()
     if not config:
-        config = ScannerConfig()
+        from backend.config import settings
+        config = ScannerConfig(
+            auto_trading_enabled=False,
+            scan_interval_seconds=settings.scanner_interval,
+            max_markets_per_scan=100,
+            min_score_to_trade=8,
+            min_score_to_show=5,
+            min_volume_24h=5000.0,
+            min_liquidity=2000.0,
+            max_active_positions=settings.default_max_positions,
+            max_capital_per_trade=settings.default_capital_allocation,
+            max_total_capital=settings.default_capital_allocation * settings.default_max_positions,
+            default_ratio_yes=settings.default_ratio_yes,
+            default_ratio_no=settings.default_ratio_no,
+            stop_loss_percent=settings.default_stop_loss,
+            take_profit_percent=settings.default_take_profit,
+            exit_model="GLOBAL",
+            leg_stop_loss_percent=5.0,
+            leg_take_profit_price=0.98
+        )
         db.add(config)
         db.commit()
         db.refresh(config)
+    
+    # Repair zero/invalid values if they exist
+    # This happens if DB was initialized with empty defaults
+    if config.scan_interval_seconds == 0:
+        from backend.config import settings
+        config.scan_interval_seconds = settings.scanner_interval
+        config.max_markets_per_scan = 100
+        config.min_score_to_trade = 8
+        config.min_score_to_show = 1  # Lowered from 5 to 1 to show all candidates
+        config.min_volume_24h = 5000.0
+        config.min_liquidity = 2000.0
+        config.max_active_positions = settings.default_max_positions
+        config.max_capital_per_trade = settings.default_capital_allocation
+        config.max_total_capital = settings.default_capital_allocation * settings.default_max_positions
+        config.default_ratio_yes = settings.default_ratio_yes
+        config.default_ratio_no = settings.default_ratio_no
+        config.stop_loss_percent = settings.default_stop_loss
+        config.take_profit_percent = settings.default_take_profit
+        # Ensure new fields are set if missing/null
+        if not config.exit_model:
+            config.exit_model = "GLOBAL"
+        
+        db.commit()
+        db.refresh(config)
+        
     return config
 
 

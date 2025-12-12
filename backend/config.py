@@ -23,6 +23,10 @@ class Settings(BaseSettings):
         "POLYMARKET_API_URL",
         "https://clob.polymarket.com"
     )
+    polymarket_api_secret: Optional[str] = os.getenv("POLYMARKET_API_SECRET")
+    polymarket_api_passphrase: Optional[str] = os.getenv("POLYMARKET_API_PASSPHRASE")
+    web3_provider_url: str = os.getenv("WEB3_PROVIDER_URI", "")
+    
     
     # Wallet
     wallet_address: Optional[str] = os.getenv("WALLET_ADDRESS")
@@ -47,6 +51,15 @@ class Settings(BaseSettings):
     scanner_interval: int = int(os.getenv("SCANNER_INTERVAL", "60"))
     position_monitor_interval: int = int(os.getenv("POSITION_MONITOR_INTERVAL", "30"))
     whale_tracker_interval: int = int(os.getenv("WHALE_TRACKER_INTERVAL", "120"))
+    
+    # Sniper Mode Configuration
+    enable_sniper_mode: bool = os.getenv("ENABLE_SNIPER_MODE", "False").lower() == "true"
+    sniper_max_subscriptions: int = int(os.getenv("SNIPER_MAX_SUBSCRIPTIONS", "50"))
+    
+    
+    # Discord Notifications
+    discord_webhook_url: Optional[str] = os.getenv("DISCORD_WEBHOOK_URL")
+    discord_notify_min_score: int = int(os.getenv("DISCORD_NOTIFY_MIN_SCORE", "7"))
     
     class Config:
         env_file = ".env"

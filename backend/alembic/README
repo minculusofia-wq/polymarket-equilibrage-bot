@@ -1,0 +1,49 @@
+# Alembic Migrations
+
+Ce dossier contient les migrations de base de données gérées par Alembic.
+
+## Commandes utiles
+
+### Créer une nouvelle migration
+```bash
+alembic revision -m "description de la migration"
+```
+
+### Créer une migration automatique (autogenerate)
+```bash
+alembic revision --autogenerate -m "description"
+```
+
+### Appliquer les migrations
+```bash
+# Appliquer toutes les migrations
+alembic upgrade head
+
+# Appliquer une migration spécifique
+alembic upgrade <revision_id>
+```
+
+### Annuler une migration
+```bash
+# Revenir à la migration précédente
+alembic downgrade -1
+
+# Revenir à une migration spécifique
+alembic downgrade <revision_id>
+```
+
+### Voir l'historique
+```bash
+alembic history
+```
+
+### Voir la version actuelle
+```bash
+alembic current
+```
+
+## Structure
+
+- `env.py` : Configuration de l'environnement Alembic
+- `script.py.mako` : Template pour les fichiers de migration
+- `versions/` : Dossier contenant les fichiers de migration (sera créé automatiquement)

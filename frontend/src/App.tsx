@@ -109,7 +109,7 @@ function App() {
               <StatCard
                 title="Opportunités"
                 value={opportunities.length}
-                subtitle={`Top: ${opportunities[0]?.total_score || 0}/10`}
+                subtitle={`Top: ${opportunities[0]?.score || 0}/10`}
               />
             </div>
 
@@ -169,9 +169,13 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'settings' && config && (
+        {activeTab === 'settings' && (
           <div className="settings">
-            <ConfigPanel config={config} onUpdate={updateConfig} />
+            {config ? (
+              <ConfigPanel config={config} onUpdate={updateConfig} />
+            ) : (
+              <div className="loading-state">Chargement de la configuration...</div>
+            )}
 
             <section className="section">
               <h3>📝 Configuration Wallet</h3>

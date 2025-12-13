@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 import os
 from dotenv import load_dotenv
@@ -60,10 +60,12 @@ class Settings(BaseSettings):
     # Discord Notifications
     discord_webhook_url: Optional[str] = os.getenv("DISCORD_WEBHOOK_URL")
     discord_notify_min_score: int = int(os.getenv("DISCORD_NOTIFY_MIN_SCORE", "7"))
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"  # Allow extra fields in .env
+    )
 
 # Global settings instance
 settings = Settings()

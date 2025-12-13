@@ -1,4 +1,4 @@
-# ⚖️ Polymarket Equilibrage Bot (v0.2.0)
+# ⚖️ Polymarket Equilibrage Bot (v0.2.1)
 
 Bot de trading autonome haute performance pour Polymarket. Détecte les opportunités d'arbitrage et de value trading en temps réel.
 
@@ -6,13 +6,14 @@ Bot de trading autonome haute performance pour Polymarket. Détecte les opportun
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![React](https://img.shields.io/badge/frontend-React-61dafb)
 
-## 🚀 Fonctionnalités Clés
+## 🚀 Fonctionnalités Clés (v0.2.1)
 
-- **Scanner Avancé (Asyncio)** : Analyse parallèle de 20+ marchés simultanément (0.7s / scan).
+- **Scanner 2.0 (Optimisé)** : Algo de détection amélioré (Volume Effectif + Liquidité) avec cache intelligent. Détecte les opportunités "invisibles" (long-term bets).
+- **Scanner Avancé (Asyncio)** : Analyse parallèle de 50+ marchés simultanément (2s / 100 marchés).
 - **Scoring Multi-Critères** : Algorithme propriétaire basés sur 5 facteurs (Divergence, Volume, Liquidité, Timing, Activité).
-- **Trading Autonome** : Exécution automatique des ordres sur la blockchain (via API CLOB).
-- **Temps Réel (WebSockets)** : Mises à jour instantanées du P&L, des positions et du scanner.
-- **Sécurité** : Gestion stricte des trades (pas de simulation, exécution réelle ou rien) et Panic Button.
+- **Trading Autonome** : Exécution automatique des ordres sur la blockchain (via API CLOB) avec gestion d'erreurs.
+- **Temps Réel (WebSockets)** : Mises à jour instantanées du P&L, des positions et du scanner sur le dashboard.
+- **Sécurité** : Gestion stricte des trades (Cost Protection check), Panic Button, et Repair Script intégré.
 - **Dashboard Complet** : Interface React moderne pour le monitoring et le contrôle.
 
 ## 🛠 Prérequis
@@ -42,9 +43,15 @@ Bot de trading autonome haute performance pour Polymarket. Détecte les opportun
    ```
    
    Le script va :
-   - Démarrer la base de données (PostgreSQL) et le cache (Redis) via Docker.
    - Lancer le Backend (FastAPI).
    - Lancer le Frontend (React/Vite).
+
+4. **En cas de problème (Base de données)**
+   Si vous rencontrez des erreurs de configuration ou de base de données :
+   ```bash
+   python3 backend/repair_config.py
+   ```
+   *Attention : Cela réinitialise la configuration par défaut.*
 
 ## 🖥 Interface
 

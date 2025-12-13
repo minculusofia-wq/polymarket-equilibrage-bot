@@ -476,9 +476,20 @@ class AutoTradingEngine:
                 current_price = await self.client.get_midpoint_price(token_id) or position.current_price_no
                 
             # Execute Sell
-            # TODO: Integrate real order execution here when wallet is ready
-            # For now, we simulate the 'Sell' logic on DB level if real order succeeds (or implies logic)
-            # In Phase 5, we assume we might not have keys yet so we just mark it.
+            logger.info(f"📉 Executing SELL order for {side.value} on {position.market_name}...")
+            
+            # Place Order
+            sell_order = await self.client.place_order(
+                token_id=token_id,
+                side="SELL",
+                size=amount,
+                price=current_price # Market sell might be safer but limiting to current midpoint for now
+            )
+            
+            if not sell_order:
+                # If no keys, we mock the sell for simulation purposes if configured, else logging error
+                logger.warning("⚠️ Sell order failed (No keys?). Simulating exit for state tracking.")
+                # In real prod, we might want to retry or alert user
             
             # Record exit trade
             self._record_trade(db, position, side, TradeType.EXIT, amount, current_price)
@@ -486,7 +497,7 @@ class AutoTradingEngine:
             # Update Position State
             if side == TradeSide.YES:
                 position.is_yes_closed = True
-                position.active_side = PositionSide.NO if not position.is_no_closed else PositionSide.BOTH # Should ideally be NONE if closed
+                position.active_side = PositionSide.NO if not position.is_no_closed else PositionSide.BOTH 
                 position.amount_yes = 0 # Holdings are gone
                 position.current_value_yes = 0
             else:

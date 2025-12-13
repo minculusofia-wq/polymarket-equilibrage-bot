@@ -75,20 +75,19 @@ export interface Position {
 }
 
 export interface Opportunity {
+    id: number;
     market_id: string;
     market_name: string;
     price_yes: number;
     price_no: number;
-    divergence_score: number;
-    volume_score: number;
-    liquidity_score: number;
-    timing_score: number;
-    activity_score: number;
-    total_score: number;
+    divergence: number;
+    score: number;
     volume_24h: number;
     liquidity: number;
-    hours_to_resolution: number | null;
-    analyzed_at: string;
+    spread_percent?: number;
+    estimated_net_profit?: number;
+    is_active: boolean;
+    detected_at: string;
 }
 
 export interface ScanResult {

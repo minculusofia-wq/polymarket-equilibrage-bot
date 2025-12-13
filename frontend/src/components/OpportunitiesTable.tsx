@@ -1,19 +1,68 @@
+import { useState, useMemo } from 'react';
 import type { Opportunity } from '../services/api';
 import { useConfigStore } from '../store';
 
 interface OpportunitiesTableProps {
     opportunities: Opportunity[];
-    onTrade: (marketId: string, capital: number, ratioYes: number, ratioNo: number) => void;
+    onTrade?: (marketId: string, amount: number, ratioYes: number, ratioNo: number) => void;
     loading?: boolean;
 }
 
-export function OpportunitiesTable({ opportunities, onTrade, loading }: OpportunitiesTableProps) {
-    const { capitalPerTrade, ratioYes, ratioNo } = useConfigStore();
+const formatNumber = (num: number) => {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+    return num.toFixed(0);
+};
 
-    const getScoreColor = (score: number) => {
-        if (score >= 8) return 'score-high';
-        if (score >= 5) return 'score-medium';
-        return 'score-low';
+type SortField = 'score' | 'estimated_net_profit' | 'liquidity' | 'spread_percent';
+type SortDirection = 'asc' | 'desc';
+
+export function OpportunitiesTable({ opportunities, onTrade: _onTrade, loading }: OpportunitiesTableProps) {
+    const { } = useConfigStore();
+
+    // State for Sorting & Filtering
+    const [sortField, setSortField] = useState<SortField>('score');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+    const [filterProfitable, setFilterProfitable] = useState(false);
+    const [filterLiquid, setFilterLiquid] = useState(false);
+
+    // Dynamic processing
+    const processedOpportunities = useMemo(() => {
+        let items = [...opportunities];
+
+        // 1. Filter
+        if (filterProfitable) {
+            items = items.filter(op => (op.estimated_net_profit || 0) > 0);
+        }
+        if (filterLiquid) {
+            items = items.filter(op => op.liquidity >= 10000);
+        }
+
+        // 2. Sort
+        items.sort((a, b) => {
+            const aValue = a[sortField] || 0;
+            const bValue = b[sortField] || 0;
+
+            if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return items;
+    }, [opportunities, sortField, sortDirection, filterProfitable, filterLiquid]);
+
+    const handleSort = (field: SortField) => {
+        if (sortField === field) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('desc'); // Default to desc for new field
+        }
+    };
+
+    const getSortIcon = (field: SortField) => {
+        if (sortField !== field) return '↕';
+        return sortDirection === 'asc' ? '↑' : '↓';
     };
 
     if (loading) {
@@ -28,8 +77,8 @@ export function OpportunitiesTable({ opportunities, onTrade, loading }: Opportun
         return (
             <div className="table-container">
                 <div className="empty-state">
-                    <p>Aucune opportunité détectée</p>
-                    <span>Lancez un scan pour détecter des opportunités</span>
+                    <p>Aucune opportunité détectée pour le moment.</p>
+                    <small>Le scanner analyse les marchés en arrière-plan...</small>
                 </div>
             </div>
         );
@@ -37,49 +86,101 @@ export function OpportunitiesTable({ opportunities, onTrade, loading }: Opportun
 
     return (
         <div className="table-container">
+            {/* Toolbar */}
+            <div className="table-toolbar">
+                <div className="toolbar-filters">
+                    <button
+                        className={`filter-btn ${filterProfitable ? 'active' : ''}`}
+                        onClick={() => setFilterProfitable(!filterProfitable)}
+                    >
+                        💰 Rentables
+                    </button>
+                    <button
+                        className={`filter-btn ${filterLiquid ? 'active' : ''}`}
+                        onClick={() => setFilterLiquid(!filterLiquid)}
+                    >
+                        💧 Liquides {'>'}10k
+                    </button>
+                </div>
+                <div className="toolbar-stats">
+                    {processedOpportunities.length} opportunités
+                </div>
+            </div>
+
             <table className="data-table">
                 <thead>
                     <tr>
-                        <th>Score</th>
-                        <th>Marché</th>
+                        <th>Market</th>
+                        <th onClick={() => handleSort('score')} className="sortable">
+                            Score {getSortIcon('score')}
+                        </th>
                         <th>Prix YES/NO</th>
-                        <th>Scores Détail</th>
-                        <th>Actions</th>
+                        <th onClick={() => handleSort('spread_percent')} className="sortable">
+                            Spread {getSortIcon('spread_percent')}
+                        </th>
+                        <th onClick={() => handleSort('estimated_net_profit')} className="sortable">
+                            Rendement Net {getSortIcon('estimated_net_profit')}
+                        </th>
+                        <th onClick={() => handleSort('liquidity')} className="sortable">
+                            Liquidité {getSortIcon('liquidity')}
+                        </th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {opportunities.map((opp, index) => (
-                        <tr key={opp.market_id + '-' + index}>
+                    {processedOpportunities.map((op) => (
+                        <tr key={op.market_id} className={op.score >= 8 ? 'high-score' : ''}>
+                            <td className="market-name" title={op.market_name}>
+                                <div className="market-name-text">
+                                    {op.market_name.length > 60
+                                        ? op.market_name.substring(0, 60) + '...'
+                                        : op.market_name}
+                                </div>
+                                <div className="market-id">{op.market_id}</div>
+                            </td>
                             <td>
-                                <div className={`score-badge ${getScoreColor(opp.total_score)}`}>
-                                    {opp.total_score}
+                                <span className={`score score-${op.score}`}>
+                                    {op.score}/10
+                                </span>
+                            </td>
+                            <td>
+                                <div className="prices">
+                                    <span className="price-yes" title="YES">{op.price_yes?.toFixed(3)}</span>
+                                    <span className="price-sep">/</span>
+                                    <span className="price-no" title="NO">{op.price_no?.toFixed(3)}</span>
                                 </div>
                             </td>
                             <td>
-                                <div className="market-name" title={opp.market_name}>
-                                    {opp.market_name.length > 50
-                                        ? opp.market_name.substring(0, 50) + '...'
-                                        : opp.market_name}
-                                </div>
+                                {op.spread_percent !== undefined ? (
+                                    <span className={op.spread_percent > 0.05 ? 'text-danger' : 'text-success'}>
+                                        {(op.spread_percent * 100).toFixed(1)}%
+                                    </span>
+                                ) : '-'}
                             </td>
                             <td>
-                                <span className="price-yes">{opp.price_yes?.toFixed(3)}</span>
-                                {' / '}
-                                <span className="price-no">{opp.price_no?.toFixed(3)}</span>
+                                {op.estimated_net_profit !== undefined ? (
+                                    <span className={op.estimated_net_profit > 0 ? 'net-profit-pos' : 'net-profit-neg'}>
+                                        {op.estimated_net_profit > 0 ? '+' : ''}{(op.estimated_net_profit * 100).toFixed(2)}%
+                                    </span>
+                                ) : '-'}
                             </td>
                             <td>
-                                <div className="score-details">
-                                    <span title="Divergence">D:{opp.divergence_score?.toFixed(1)}</span>
-                                    <span title="Volume">V:{opp.volume_score?.toFixed(1)}</span>
-                                    <span title="Liquidité">L:{opp.liquidity_score?.toFixed(1)}</span>
+                                <div className="liquidity-cell">
+                                    <span>${formatNumber(op.liquidity)}</span>
+                                    <div className="liquidity-bar">
+                                        <div
+                                            className="liquidity-fill"
+                                            style={{ width: `${Math.min(100, (op.liquidity / 100000) * 100)}%` }}
+                                        />
+                                    </div>
                                 </div>
                             </td>
                             <td>
                                 <button
-                                    className="btn btn-primary btn-sm"
-                                    onClick={() => onTrade(opp.market_id, capitalPerTrade, ratioYes, ratioNo)}
+                                    className="trade-btn"
+                                    onClick={() => window.open(`https://polymarket.com/market/${op.market_id}`, '_blank')}
                                 >
-                                    Trader ${capitalPerTrade}
+                                    Voir
                                 </button>
                             </td>
                         </tr>

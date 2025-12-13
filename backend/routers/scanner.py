@@ -112,7 +112,7 @@ def get_or_create_config(db: Session) -> ScannerConfig:
     
     # Repair zero/invalid values if they exist
     # This happens if DB was initialized with empty defaults
-    if config.scan_interval_seconds == 0:
+    if not config.scan_interval_seconds or config.scan_interval_seconds == 0:
         from backend.config import settings
         config.scan_interval_seconds = settings.scanner_interval
         config.max_markets_per_scan = 100
@@ -128,8 +128,9 @@ def get_or_create_config(db: Session) -> ScannerConfig:
         config.stop_loss_percent = settings.default_stop_loss
         config.take_profit_percent = settings.default_take_profit
         # Ensure new fields are set if missing/null
-        if not config.exit_model:
-            config.exit_model = "GLOBAL"
+        config.exit_model = config.exit_model or "GLOBAL"
+        config.leg_stop_loss_percent = config.leg_stop_loss_percent or 5.0
+        config.leg_take_profit_price = config.leg_take_profit_price or 0.98
         
         db.commit()
         db.refresh(config)
@@ -263,8 +264,15 @@ async def trigger_advanced_scan(
 @router.get("/config", response_model=ScannerConfigResponse)
 async def get_scanner_config(db: Session = Depends(get_db)):
     """Get current scanner configuration"""
-    config = get_or_create_config(db)
-    return config.to_dict()
+    try:
+        config = get_or_create_config(db)
+        # logger.debug(f"Serving config: {config.id}") # Optional debug
+        return config.to_dict()
+    except Exception as e:
+        # logger.error(f"Error serving config: {e}")
+        # Return default config in worst case to not break frontend
+        from backend.models.scanner_config import ScannerConfig as ModelConfig
+        return ModelConfig().to_dict()
 
 
 @router.put("/config", response_model=ScannerConfigResponse)

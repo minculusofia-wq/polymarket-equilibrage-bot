@@ -210,24 +210,31 @@ export function useConfig() {
 
     const refresh = useCallback(async () => {
         try {
+            setLoading(true); // Ensure loading state is true at start
             const data = await getScannerConfig();
-            setConfig(data);
-            setStoreConfig({
-                minScoreToTrade: data.min_score_to_trade,
-                minScoreToShow: data.min_score_to_show,
-                capitalPerTrade: data.max_capital_per_trade,
-                maxPositions: data.max_active_positions,
-                ratioYes: data.default_ratio_yes,
-                ratioNo: data.default_ratio_no,
-                stopLossPercent: data.stop_loss_percent,
-                takeProfitPercent: data.take_profit_percent,
-            });
+            if (data) {
+                setConfig(data);
+                setStoreConfig({
+                    minScoreToTrade: data.min_score_to_trade,
+                    minScoreToShow: data.min_score_to_show,
+                    capitalPerTrade: data.max_capital_per_trade,
+                    maxPositions: data.max_active_positions,
+                    ratioYes: data.default_ratio_yes,
+                    ratioNo: data.default_ratio_no,
+                    stopLossPercent: data.stop_loss_percent,
+                    takeProfitPercent: data.take_profit_percent,
+                });
+            } else {
+                console.error('Config data is null/undefined');
+                addNotification('error', 'Configuration vide reçue');
+            }
         } catch (err) {
             console.error('Config error:', err);
+            addNotification('error', 'Erreur chargement configuration');
         } finally {
             setLoading(false);
         }
-    }, [setStoreConfig]);
+    }, [setStoreConfig, addNotification]);
 
     const update = useCallback(async (updates: Partial<ScannerConfig>) => {
         try {

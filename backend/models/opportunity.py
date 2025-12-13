@@ -24,6 +24,10 @@ class Opportunity(Base):
     volume_24h = Column(Float, nullable=True)
     liquidity = Column(Float, nullable=True)
     
+    # Advanced metrics
+    spread_percent = Column(Float, default=0.0)
+    estimated_net_profit = Column(Float, default=0.0)
+    
     # Status
     is_active = Column(Boolean, default=True, index=True)
     is_traded = Column(Boolean, default=False)

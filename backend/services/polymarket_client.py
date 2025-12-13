@@ -75,9 +75,16 @@ class PolymarketClient:
         """
         try:
             url = f"{GAMMA_API_URL}/markets"
-            params = {"limit": limit}
-            if active_only:
-                params["active"] = "true"
+            # Sort by volume to get meaningful opportunities
+            # Gamma API usually uses 'order' or 'sort'. 
+            # Trying 'order' -> volume24hr (Gamma specific)
+            params = {}
+            params["limit"] = limit
+            params["active"] = "true"
+            params["closed"] = "false" 
+            # Sort by liquidity to ensure tradeable markets (Volume can be historical/dead)
+            params["order"] = "liquidity"
+            params["ascending"] = "false"
             
             response = await self.http_client.get(url, params=params)
             response.raise_for_status()
@@ -217,17 +224,23 @@ class PolymarketClient:
                  self._init_clob_client()
             
             if not self.clob_client:
-                 logger.error("ClobClient initialization failed")
+                 logger.error("ClobClient initialization failed, cannot place order")
                  return None
 
             # Execute via sync call wrapper (as py-clob-client is sync by default)
             # For async context, we should ideally run in threadpool, but for now direct call is OK for MVP
-            resp = self.clob_client.create_and_post_order(order_args)
-            logger.info(f"Order placed successfully: {resp}")
-            return resp
+            try:
+                resp = self.clob_client.create_and_post_order(order_args)
+                logger.info(f"Order placed successfully: {resp}")
+                return resp
+            except Exception as order_error:
+                logger.error(f"py-clob-client error placing order: {order_error}")
+                # Log usage details for debugging
+                logger.error(f"Order Details - Price: {price}, Size: {size}, Side: {side}, Token: {token_id}")
+                return None
             
         except Exception as e:
-            logger.error(f"Failed to place order: {e}")
+            logger.error(f"Unexpected error in place_order: {e}")
             return None
     
     async def cancel_order(self, order_id: str) -> bool:
@@ -256,8 +269,10 @@ class PolymarketClient:
                  self._init_clob_client()
                  
             # Assuming get_open_orders returns list
-            orders = self.clob_client.get_open_orders()
-            return orders
+            if self.clob_client:
+                orders = self.clob_client.get_open_orders()
+                return orders
+            return []
         except Exception as e:
             logger.error(f"Failed to get open orders: {e}")
             return []
@@ -269,6 +284,11 @@ class PolymarketClient:
             from py_clob_client.constants import POLYGON
             from backend.config import settings
             
+            if not settings.wallet_private_key:
+                logger.warning("Wallet private key not set, skipping ClobClient init")
+                self.clob_client = None
+                return
+
             creds = None
             if settings.polymarket_api_key and settings.polymarket_api_secret and settings.polymarket_api_passphrase:
                 from py_clob_client.clob_types import ApiCreds
@@ -278,9 +298,14 @@ class PolymarketClient:
                     api_passphrase=settings.polymarket_api_passphrase
                 )
             
+            # Ensure key format is correct (hex string)
+            key = settings.wallet_private_key
+            if key.startswith('0x'):
+                key = key[2:]
+                
             self.clob_client = ClobClient(
                 host="https://clob.polymarket.com",
-                key=self.private_key,
+                key=key,
                 chain_id=137, # Polygon Mainnet
                 creds=creds
             )

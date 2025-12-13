@@ -20,23 +20,13 @@ type SortDirection = 'asc' | 'desc';
 export function OpportunitiesTable({ opportunities, onTrade: _onTrade, loading }: OpportunitiesTableProps) {
     const { } = useConfigStore();
 
-    // State for Sorting & Filtering
+    // State for Sorting
     const [sortField, setSortField] = useState<SortField>('score');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-    const [filterProfitable, setFilterProfitable] = useState(false);
-    const [filterLiquid, setFilterLiquid] = useState(false);
 
     // Dynamic processing
     const processedOpportunities = useMemo(() => {
         let items = [...opportunities];
-
-        // 1. Filter
-        if (filterProfitable) {
-            items = items.filter(op => (op.estimated_net_profit || 0) > 0);
-        }
-        if (filterLiquid) {
-            items = items.filter(op => op.liquidity >= 10000);
-        }
 
         // 2. Sort
         items.sort((a, b) => {
@@ -49,7 +39,7 @@ export function OpportunitiesTable({ opportunities, onTrade: _onTrade, loading }
         });
 
         return items;
-    }, [opportunities, sortField, sortDirection, filterProfitable, filterLiquid]);
+    }, [opportunities, sortField, sortDirection]);
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -88,22 +78,8 @@ export function OpportunitiesTable({ opportunities, onTrade: _onTrade, loading }
         <div className="table-container">
             {/* Toolbar */}
             <div className="table-toolbar">
-                <div className="toolbar-filters">
-                    <button
-                        className={`filter-btn ${filterProfitable ? 'active' : ''}`}
-                        onClick={() => setFilterProfitable(!filterProfitable)}
-                    >
-                        💰 Rentables
-                    </button>
-                    <button
-                        className={`filter-btn ${filterLiquid ? 'active' : ''}`}
-                        onClick={() => setFilterLiquid(!filterLiquid)}
-                    >
-                        💧 Liquides {'>'}10k
-                    </button>
-                </div>
-                <div className="toolbar-stats">
-                    {processedOpportunities.length} opportunités
+                <div className="toolbar-stats" style={{ width: '100%', textAlign: 'right' }}>
+                    {processedOpportunities.length} opportunités (Filtres appliqués depuis Settings)
                 </div>
             </div>
 

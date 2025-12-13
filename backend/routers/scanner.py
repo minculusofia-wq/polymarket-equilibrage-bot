@@ -147,10 +147,16 @@ async def get_opportunities(
     db: Session = Depends(get_db)
 ):
     """Get current opportunities from database"""
+    # Load config to apply filters
+    config = get_or_create_config(db)
+    
     opportunities = (
         db.query(Opportunity)
         .filter(Opportunity.is_active == True)
         .filter(Opportunity.score >= min_score)
+        # Apply Config Filters
+        .filter(Opportunity.liquidity >= config.min_liquidity)
+        .filter(Opportunity.volume_24h >= config.min_volume_24h)
         .order_by(Opportunity.score.desc())
         .limit(limit)
         .all()

@@ -82,7 +82,7 @@ class NotificationService:
             {"name": "Divergence", "value": f"{opportunity.divergence_score:.2f}", "inline": True},
             {"name": "Prices", "value": f"YES: {opportunity.price_yes:.3f} | NO: {opportunity.price_no:.3f}", "inline": False},
             {"name": "Total Cost", "value": f"{opportunity.price_yes + opportunity.price_no:.4f}", "inline": True},
-            {"name": "Link", "value": f"[View Market](https://polymarket.com/event/{opportunity.market_id})", "inline": False}
+            {"name": "Link", "value": f"[View Market](https://polymarket.com/event/{getattr(opportunity, 'market_slug', opportunity.market_id)})", "inline": False}
         ]
         
         await self.send_discord_alert(

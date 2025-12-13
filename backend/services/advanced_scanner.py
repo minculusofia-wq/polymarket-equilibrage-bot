@@ -163,7 +163,8 @@ class AdvancedScanner:
         for opp in opportunities:
             # User Request: Notify based on Scanner Config Score (min_score_to_show)
             if opp.total_score >= self.config.min_score:
-                await notification_service.notify_opportunity(opp)
+                # OPTIMIZATION: Fire and forget to avoid blocking scan on 429/timeout
+                asyncio.create_task(notification_service.notify_opportunity(opp))
 
         elapsed = (datetime.now() - start_time).total_seconds()
         logger.info(f"Scan complete: {len(opportunities)} opportunities in {elapsed:.2f}s")
@@ -315,10 +316,18 @@ class AdvancedScanner:
             
             total_score = min(10, max(1, int(total)))
             
+            # Extract proper slug (Event slug > Market slug)
+            slug = market.get("slug", "")
+            events = market.get("events", [])
+            if events and len(events) > 0:
+                event_slug = events[0].get("slug")
+                if event_slug:
+                    slug = event_slug
+            
             result = OpportunityScore(
                 market_id=market_id,
                 market_name=market.get("question", "Unknown"),
-                market_slug=market.get("slug", ""), # Extract slug
+                market_slug=slug, # Use best extraction
                 price_yes=ask_yes,
                 price_no=ask_no,
                 divergence_score=divergence_score,

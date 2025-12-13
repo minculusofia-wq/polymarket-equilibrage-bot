@@ -11,6 +11,25 @@ export function ConfigPanel({ config, onUpdate }: ConfigPanelProps) {
             <h3>⚙️ Configuration Trading</h3>
 
             <div className="config-grid">
+                {/* Auto Trading Master Switch */}
+                <div className="config-section" style={{ border: '1px solid #00ff00', background: 'rgba(0, 255, 0, 0.05)' }}>
+                    <h4>🤖 Trading Automatique</h4>
+                    <div className="config-item" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <label style={{ margin: 0 }}>Autoriser les achats</label>
+                        <input
+                            type="checkbox"
+                            checked={config.auto_trading_enabled}
+                            onChange={(e) => onUpdate({ auto_trading_enabled: e.target.checked })}
+                            style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                        />
+                    </div>
+                    <small style={{ color: '#aaa' }}>
+                        Si décoché : Le bot scanne uniquement (Mode Surveillance).
+                        <br />
+                        Si coché : Le bot prend position automatiquement.
+                    </small>
+                </div>
+
                 {/* Trading thresholds */}
                 <div className="config-section">
                     <h4>Seuils</h4>

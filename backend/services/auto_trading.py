@@ -117,12 +117,11 @@ class AutoTradingEngine:
                 try:
                     config = self._get_config(db)
                     
-                    # Only trade if auto-trading is enabled
-                    if config.auto_trading_enabled and not self.is_paused:
-                        # 1. Scan for opportunities
+                    # 1. Scan for opportunities (Always, for monitoring)
+                    if not self.is_paused:
                         await self._scan_and_trade(db, config)
                     
-                    # 2. Always monitor existing positions (even if paused)
+                    # 2. Always monitor existing positions (even if paused or disabled)
                     await self._monitor_positions(db, config)
                     
                     # Store interval for sleep outside session
@@ -170,6 +169,10 @@ class AutoTradingEngine:
             if o.total_score >= config.min_score_to_trade
             and not self._is_already_trading(db, o.market_id)
         ]
+
+        # STOP HERE if Auto-Trading is DISABLED
+        if not config.auto_trading_enabled:
+            return
         
         # Broadcast opportunities
         if opportunities:

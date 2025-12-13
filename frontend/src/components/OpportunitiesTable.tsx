@@ -178,7 +178,12 @@ export function OpportunitiesTable({ opportunities, onTrade: _onTrade, loading }
                             <td>
                                 <button
                                     className="trade-btn"
-                                    onClick={() => window.open(`https://polymarket.com/market/${op.market_id}`, '_blank')}
+                                    onClick={() => {
+                                        const url = op.market_slug
+                                            ? `https://polymarket.com/event/${op.market_slug}`
+                                            : `https://polymarket.com/?q=${encodeURIComponent(op.market_name)}`;
+                                        window.open(url, '_blank');
+                                    }}
                                 >
                                     Voir
                                 </button>

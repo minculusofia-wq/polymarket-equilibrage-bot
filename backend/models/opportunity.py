@@ -11,6 +11,7 @@ class Opportunity(Base):
     # Market information
     market_id = Column(String, nullable=False, index=True)
     market_name = Column(String, nullable=False)
+    market_slug = Column(String, nullable=True) # Added for URL
     
     # Current prices
     price_yes = Column(Float, nullable=False)

@@ -161,6 +161,9 @@ class AutoTradingEngine:
             limit=config.max_markets_per_scan
         )
         
+        # FIX: Save results to database so UI updates (otherwise UI looks "stopped")
+        self._save_scan_results(db, opportunities)
+        
         # Filter by trading threshold
         tradeable = [
             o for o in opportunities 
@@ -552,6 +555,44 @@ class AutoTradingEngine:
             total_value=amount * price
         )
         db.add(trade)
+
+    def _save_scan_results(self, db: Session, opportunities: List[OpportunityScore]):
+        """Save scan results to database to keep UI in sync"""
+        try:
+            for opp in opportunities:
+                existing = db.query(Opportunity).filter(
+                    Opportunity.market_id == opp.market_id,
+                    Opportunity.is_active == True
+                ).first()
+                
+                if existing:
+                    existing.price_yes = opp.price_yes
+                    existing.price_no = opp.price_no
+                    existing.score = opp.total_score
+                    existing.volume_24h = opp.volume_24h
+                    existing.liquidity = opp.liquidity
+                    existing.market_slug = opp.market_slug
+                    existing.updated_at = datetime.utcnow()
+                else:
+                    new_opp = Opportunity(
+                        market_id=opp.market_id,
+                        market_name=opp.market_name,
+                        market_slug=opp.market_slug,
+                        price_yes=opp.price_yes,
+                        price_no=opp.price_no,
+                        divergence=abs(1.0 - opp.price_yes - opp.price_no),
+                        score=opp.total_score,
+                        volume_24h=opp.volume_24h,
+                        liquidity=opp.liquidity,
+                        is_active=True,
+                        is_traded=False
+                    )
+                    db.add(new_opp)
+            
+            db.commit()
+        except Exception as e:
+            logger.error(f"Error saving auto-trading scan results: {e}")
+            db.rollback()
 
 
 # Global engine instance

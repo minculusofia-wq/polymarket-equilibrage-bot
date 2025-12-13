@@ -36,6 +36,7 @@ class OpportunityScore:
     """Detailed scoring breakdown"""
     market_id: str
     market_name: str
+    market_slug: str # Added slug for URL
     
     # Prices
     price_yes: float
@@ -160,7 +161,8 @@ class AdvancedScanner:
         from backend.config import settings
         notification_service = get_notification_service()
         for opp in opportunities:
-            if opp.total_score >= settings.discord_notify_min_score:
+            # User Request: Notify based on Scanner Config Score (min_score_to_show)
+            if opp.total_score >= self.config.min_score:
                 await notification_service.notify_opportunity(opp)
 
         elapsed = (datetime.now() - start_time).total_seconds()
@@ -316,6 +318,7 @@ class AdvancedScanner:
             result = OpportunityScore(
                 market_id=market_id,
                 market_name=market.get("question", "Unknown"),
+                market_slug=market.get("slug", ""), # Extract slug
                 price_yes=ask_yes,
                 price_no=ask_no,
                 divergence_score=divergence_score,
@@ -324,7 +327,7 @@ class AdvancedScanner:
                 timing_score=timing_score,
                 activity_score=activity_score,
                 total_score=total_score,
-                volume_24h=volume,
+                volume_24h=vol_24,
                 liquidity=float(market.get("liquidity", 0) or 0),
                 hours_to_resolution=self._calc_hours_to_resolution(market),
                 analyzed_at=datetime.now(),
@@ -336,7 +339,7 @@ class AdvancedScanner:
             return result
             
         except Exception as e:
-            # logger.error(f"Error analyzing market {market_id}: {e}")
+            logger.error(f"Error analyzing market {market_id}: {e}", exc_info=True)
             return None
     
     # ==================== SCORING FUNCTIONS ====================

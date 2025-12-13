@@ -78,6 +78,7 @@ export interface Opportunity {
     id: number;
     market_id: string;
     market_name: string;
+    market_slug?: string; // Optional slug
     price_yes: number;
     price_no: number;
     divergence: number;
@@ -164,14 +165,34 @@ export const getOpportunities = async (minScore: number = 1): Promise<Opportunit
     const response = await api.get('/api/scanner/opportunities', {
         params: { min_score: minScore },
     });
-    return response.data;
+    // Map backend keys to frontend interface
+    return response.data.map((item: any) => ({
+        ...item,
+        market_slug: item.market_slug,
+        score: item.total_score,
+        divergence: item.divergence_score || 0,
+        // Calculate estimated profit roughly (1 - cost)
+        estimated_net_profit: 1.0 - (item.price_yes + item.price_no),
+        spread_percent: Math.abs(item.price_yes - (1 - item.price_no)), // Rough spread proxy
+    }));
 };
 
 export const triggerScan = async (limit: number = 100): Promise<ScanResult> => {
     const response = await api.post('/api/scanner/scan', null, {
         params: { limit },
     });
-    return response.data;
+    // Map opportunities in result
+    const result = response.data;
+    if (result.opportunities) {
+        result.opportunities = result.opportunities.map((item: any) => ({
+            ...item,
+            score: item.total_score,
+            divergence: item.divergence_score || 0,
+            estimated_net_profit: 1.0 - (item.price_yes + item.price_no),
+            spread_percent: Math.abs(item.price_yes - (1 - item.price_no)),
+        }));
+    }
+    return result;
 };
 
 export const getScannerConfig = async (): Promise<ScannerConfig> => {

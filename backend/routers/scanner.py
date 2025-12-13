@@ -216,10 +216,13 @@ async def trigger_advanced_scan(
             existing.score = opp.total_score
             existing.volume_24h = opp.volume_24h
             existing.liquidity = opp.liquidity
+            existing.market_slug = opp.market_slug # Update slug
         else:
             new_opp = Opportunity(
                 market_id=opp.market_id,
                 market_name=opp.market_name,
+                market_slug=opp.market_slug, # Save slug
+                price_yes=opp.price_yes,
                 price_yes=opp.price_yes,
                 price_no=opp.price_no,
                 divergence=abs(1.0 - opp.price_yes - opp.price_no),

@@ -223,7 +223,6 @@ async def trigger_advanced_scan(
                 market_name=opp.market_name,
                 market_slug=opp.market_slug, # Save slug
                 price_yes=opp.price_yes,
-                price_yes=opp.price_yes,
                 price_no=opp.price_no,
                 divergence=abs(1.0 - opp.price_yes - opp.price_no),
                 score=opp.total_score,
